@@ -1,0 +1,26 @@
+author: Pim van Pelt <pim@google.com>
+type: lib
+description: Mongoose OS library for ADS101x and ADS111x
+version: 1.0
+
+sources:
+  - src
+
+includes:
+  - include
+
+config_schema:
+  - ["ads1x1x", "o", {title: "ads1x1x settings"}]
+  - ["ads1x1x.i2caddr", "i", 0x40, {title: "I2C Address"}]
+
+libs:
+  - origin: https://github.com/mongoose-os-libs/i2c
+    version: latest
+
+tags:
+  - c
+  - i2c
+  - hw
+  - docs:drivers:ADS1X1X I2C
+
+manifest_version: 2017-09-29
