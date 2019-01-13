@@ -23,23 +23,22 @@ First, create a device using `mgos_ads1x1x_create()` by specifying the type of
 chip you're using. Take some measurements using `mgos_ads1x1x_read()`, and
 clean up the driver by using `mgos_ads1x1x_destroy()`.
 
-
-***`mgos_ads1x1x_set_fsr()`*** is used to set the full scale range (FSR) of
+`mgos_ads1x1x_set_fsr()` is used to set the full scale range (FSR) of
 the ADC. Each chip supports ranges from 6.144 Volts down to 0.256 Volts. You
-can read the current FSR with ***`mgos_ads1x1x_get_fsr()`***.
+can read the current FSR with `mgos_ads1x1x_get_fsr()`.
 
-***`mgos_ads1x1x_set_dr()`*** is used to set the data rate of continuous
+`mgos_ads1x1x_set_dr()` is used to set the data rate of continuous
 measurements. The support differs between `ADS101X` (the 12-bit version,
 which is faster), and `ADS111X` (the 16-bit version, which is slower). You
-can read the current DR with ***`mgos_ads1x1x_get_dr()`***.
+can read the current DR with `mgos_ads1x1x_get_dr()`.
 
-***`mgos_ads1x1x_read()`*** starts a singleshot measurement on the given
+`mgos_ads1x1x_read()` starts a singleshot measurement on the given
 channel (which takes 1ms for `ADS101X` and 8ms for `ADS111X`), and
 returns a 16 bit signed value. The datasheet mentions that with input
 voltages around `GND`, a negative value might be returned (ie -2 rather
 than 0).
 
-***`mgos_ads1x1x_read_diff()`*** starts a singleshot measurement of
+`mgos_ads1x1x_read_diff()` starts a singleshot measurement of
 the differential voltage between two channels, typically `Chan0` and
 `Chan1`. Several channel pairs are allowed, see the include file for
 details. Note, that this function is only available on `ADS1X15` chips.
