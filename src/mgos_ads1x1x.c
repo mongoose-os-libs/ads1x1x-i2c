@@ -340,19 +340,19 @@ bool mgos_ads1x1x_read_diff(struct mgos_ads1x1x *dev, uint8_t chanP, uint8_t cha
     }
   } else {
     if (dev->type != ADC_ADS1015 && dev->type != ADC_ADS1115) {
-      if (chanN != 0 || chanP != 1) {
+      if (chanP != 0 || chanN != 1) {
         return false;
       }
       mux = 0;
     } else {
       // ADS1X15: Differential read, only 4 allowed combinations
-      if (chanN == 0 && chanP == 1) {
+      if (chanP == 0 && chanN == 1) {
         mux = 0;
-      } else if (chanN == 0 && chanP == 3) {
+      } else if (chanP == 0 && chanN == 3) {
         mux = 1;
-      } else if (chanN == 1 && chanP == 3) {
+      } else if (chanP == 1 && chanN == 3) {
         mux = 2;
-      } else if (chanN == 2 && chanP == 3) {
+      } else if (chanP == 2 && chanN == 3) {
         mux = 3;
       } else {
         return false;
