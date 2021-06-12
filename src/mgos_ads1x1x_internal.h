@@ -21,12 +21,13 @@
 extern "C" {
 #endif
 
-// ADS1X1X I2C address
+// ADS1X1X I2C address, note default for ADS1119 with A0 & A1 tied to GND is 0x40
 #define MGOS_ADS1X1X_I2C_ADDR            (0x48)
 
 // Registers
 #define MGOS_ADS1X1X_REG_POINTER_MASK    (0x03)
 #define MGOS_ADS1X1X_REG_POINTER_CONV    (0x00)
+#define MGOS_ADS1119_REG_POINTER_COMMAND (0x00)
 #define MGOS_ADS1X1X_REG_POINTER_CONF    (0x01)
 #define MGOS_ADS1X1X_REG_POINTER_LO_T    (0x02)
 #define MGOS_ADS1X1X_REG_POINTER_HI_T    (0x03)
@@ -36,6 +37,12 @@ struct mgos_ads1x1x {
   uint8_t                i2caddr;
   enum mgos_ads1x1x_type type;
   uint8_t                channels;
+  uint8_t                configuration[2]; // allow for 16 bit configuration with an array. ADS1119 only uses configuration[0]
+  uint8_t                mux;
+  uint8_t                gain;
+  uint8_t                dataRate;
+  uint8_t                conversionMode;
+  uint8_t                vRef;
 };
 
 /* Mongoose OS initializer */

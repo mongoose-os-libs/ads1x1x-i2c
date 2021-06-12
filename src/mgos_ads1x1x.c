@@ -35,6 +35,8 @@ static char *mgos_ads1x1x_type_str(struct mgos_ads1x1x *dev) {
 
   case ADC_ADS1115: return "ADS1115";
 
+  case ADC_ADS1119: return "ADS1119";
+
   default: return "UNKNOWN";
   }
 }
@@ -44,13 +46,24 @@ static bool mgos_ads1x1x_reset(struct mgos_ads1x1x *dev) {
     return false;
   }
 
-  return mgos_i2c_write_reg_w(dev->i2c, dev->i2caddr, MGOS_ADS1X1X_REG_POINTER_CONF, 0x8583);
+  if (dev->type == ADC_ADS1119) {
+      LOG(LL_DEBUG, ("mgos_ads1x1x_reset for ADS1119"));
+
+      uint8_t val1[] = { 0x06 };
+      return mgos_i2c_write(dev->i2c, dev->i2caddr, val1, sizeof(val1), true);
+
+  } else {
+      LOG(LL_DEBUG, ("mgos_ads1x1x_reset for generic 1x1x"));
+
+      return mgos_i2c_write_reg_w(dev->i2c, dev->i2caddr, MGOS_ADS1X1X_REG_POINTER_CONF, 0x8583);
+  }
+
 }
 
 struct mgos_ads1x1x *mgos_ads1x1x_create(struct mgos_i2c *i2c, uint8_t i2caddr, enum mgos_ads1x1x_type type) {
   struct mgos_ads1x1x *dev = NULL;
 
-  if (!i2c || type == ADC_NONE || type > ADC_ADS1115) {
+  if (!i2c || type == ADC_NONE || type > ADC_ADS1119) {
     return NULL;
   }
 
@@ -66,6 +79,7 @@ struct mgos_ads1x1x *mgos_ads1x1x_create(struct mgos_i2c *i2c, uint8_t i2caddr, 
   switch (type) {
   case ADC_ADS1015:
   case ADC_ADS1115:
+  case ADC_ADS1119:
     dev->channels = 4;
     break;
 
@@ -80,6 +94,64 @@ struct mgos_ads1x1x *mgos_ads1x1x_create(struct mgos_i2c *i2c, uint8_t i2caddr, 
   }
   LOG(LL_INFO, ("%s initialized at I2C 0x%02x", mgos_ads1x1x_type_str(dev), dev->i2caddr));
   return dev;
+}
+
+struct mgos_ads1x1x* mgos_ads1119_create(struct mgos_i2c * i2c, uint8_t i2caddr, enum mgos_ads1x1x_type type, enum mgos_ads1119_gain gain, enum mgos_ads1x1x_dr dataRate, enum mgos_ads1119_conversion_mode conversionMode, enum mgos_ads1119_vref vRef)
+{
+    struct mgos_ads1x1x* dev = mgos_ads1x1x_create(i2c, i2caddr, type);
+
+    // Note: we choose mux at read time
+    dev->gain = gain;
+    dev->dataRate = dataRate;
+    dev->conversionMode = conversionMode;
+    dev->vRef = vRef;
+
+    LOG(LL_DEBUG, ("I2C ADS ADS1119 set conf gain:%d DR:%d conversionMode:%d vRef:%d", gain, dataRate, conversionMode, vRef));
+
+    dev->configuration[0] = 0;
+
+    if (gain) {
+        LOG(LL_DEBUG, ("Set ADS1119 gain to 1"));
+        dev->configuration[0] |= (1 << 4); // binary:00010000 Turn bit 0 (position) to 1 if it isn't already
+    } else {
+        //LOG(LL_INFO, ("Set ADS1119 gain to 0"));
+    }
+
+    uint8_t dataRateVal = 0;
+    if (dataRate) {
+        switch (dataRate) {
+        case MGOS_ADS1X1X_SPS_90:
+            dataRateVal = 1;
+            break;
+        case MGOS_ADS1X1X_SPS_330:
+            dataRateVal = 2;
+            break;
+        case MGOS_ADS1X1X_SPS_1000:
+        case MGOS_ADS1X1X_SPS_MAX:
+            dataRateVal = 3;
+            break;
+        case MGOS_ADS1X1X_SPS_MIN:
+        case MGOS_ADS1X1X_SPS_20:
+        default:
+            dataRateVal = 0;
+        }
+
+        LOG(LL_DEBUG, ("I2C ADS1119 new config dataRateVal %d", dataRateVal));
+
+        dev->configuration[0] |= (dataRateVal << 2); // shift our simple 1 decimal value over 1 bit
+    }
+
+    if (conversionMode) { // neatly limits it to 0 or >0 values with the explicit 1 << 1 below
+        dev->configuration[0] |= (1 << 1); // shift our simple 1 decimal value over 1 bit
+    }
+
+    if (vRef) { // neatly limits it to 0 or >0 values with the explicit 1 << 1 below
+        dev->configuration[0] |= 1;
+    }
+
+    mgos_ads1119_write_conf(dev, dev->configuration[0]);
+
+    return dev;
 }
 
 bool mgos_ads1x1x_destroy(struct mgos_ads1x1x **dev) {
@@ -313,6 +385,82 @@ bool mgos_ads1x1x_get_dr(struct mgos_ads1x1x *dev, enum mgos_ads1x1x_dr *dr) {
 
 bool mgos_ads1x1x_read(struct mgos_ads1x1x *dev, uint8_t chan, int16_t *result) {
   return mgos_ads1x1x_read_diff(dev, chan, 0xff, result);
+}
+
+bool mgos_ads1119_write_conf(struct mgos_ads1x1x* dev, uint8_t value) {
+    uint8_t tmp[2] = { 0x40, (uint8_t)value }; // Command byte, then the new configuration byte
+
+    bool res = false;
+    res = mgos_i2c_write(dev->i2c, dev->i2caddr, tmp, sizeof(tmp), true /* stop */);
+
+    if (res) {
+        LOG(LL_INFO, ("I2C ADS1119 write conf (%d) succeeded", value));
+    } else {
+        LOG(LL_INFO, ("I2C ADS1119 write conf (%d) failed", value));
+    }
+    return res;
+}
+bool mgos_ads1119_read(struct mgos_ads1x1x* dev, uint8_t mux, int16_t* result) {
+    int16_t result_val;
+    *result = 0; // default value
+
+    uint8_t chan = mux - 3; // human friendly map from MUX to AINx
+
+    // Clear and set the bits for MUX
+    dev->configuration[0] |= (7 << 5); // make it all 1's for MUX
+    dev->configuration[0] &= ~(7 << 5); // set MUX fields to 1, then mirror to NOT, then apply AND so anything aside from MUX will stay if previously set
+    dev->configuration[0] |= (mux << 5); // now apply mux fields
+
+    if (!mgos_ads1119_write_conf(dev, dev->configuration[0])){
+        LOG(LL_INFO, ("i2c mgos_ads1119_read had error when updating mux, config: %d mux:%d AIN%d", dev->configuration[0], mux, chan));
+        return false;
+    } else {
+        LOG(LL_INFO, ("i2c mgos_ads1119_read success updating mux, config: %d mux:%d AIN%d", dev->configuration[0], mux, chan));
+    }
+
+    // Send start/sync 0000 100x command
+    uint8_t val1[] = { 0x08 };
+    if (mgos_i2c_write(dev->i2c, dev->i2caddr, val1, sizeof(val1), true)){
+        // Wait for conversion to complete
+        if (dev->dataRate >= MGOS_ADS1X1X_SPS_90){
+            LOG(LL_INFO, ("i2c mgos_ads1119_read success sending 0x08 start command, waiting 55usleep"));
+            // TODO: switch on delay based on data rate. Someone is welcome to, I prefer using the 20SPS digital filter features
+            mgos_msleep(20); // NOTE usleep (microseconds )
+        } else {
+            LOG(LL_INFO, ("i2c mgos_ads1119_read success sending 0x08 start command, waiting 80msleep"));
+            mgos_msleep(50 + 10); // Milliseconds! it's a touch over 50ms for 20SPS, data sheet warns its not precisely 1 second / 20!
+        }
+    }
+
+    // Tell it we're going to read with RDATA command
+    uint8_t reg = 0x10;
+    if (!mgos_i2c_write(dev->i2c, dev->i2caddr, &reg, 1, false /* stop */)) {
+        LOG(LL_INFO, ("i2c mgos_ads1119_read prewrite returned error, mux: %d", mux));
+        *result = -1;
+        return false;
+    }
+
+    // Now read the actual value
+    uint8_t tmp[2];
+    if (!mgos_i2c_read(dev->i2c, dev->i2caddr, tmp, 2, true /* stop */)){
+        LOG(LL_INFO, ("i2c mgos_ads1119_read read request returned error, mux: %d", mux));
+        *result = -1;
+        return false;
+    }
+
+    // Convert from our 2 element byte array to a integer with some left bit shifting
+    result_val = (((uint16_t) tmp[0]) << 8) | tmp[1];
+
+    // Let's return -1 when we get a negative number as it means it's floating unconnected
+    if (result_val < 0){
+        LOG(LL_DEBUG, ("i2c mgos_ads1119_read returned negative, likely unplugged: val %d, mux: %d", result_val, mux));
+        *result = -1;
+        return false;
+    } else {
+        LOG(LL_DEBUG, ("i2c mgos_ads1119_read returned val: %d, mux %d AIN%d", result_val, mux, chan));
+        *result = result_val;
+        return true;
+    }
 }
 
 // if chanN is 0xff, perform a single ended read (with chanP against GND)
