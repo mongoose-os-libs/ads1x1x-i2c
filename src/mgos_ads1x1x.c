@@ -35,6 +35,8 @@ static char *mgos_ads1x1x_type_str(struct mgos_ads1x1x *dev) {
 
   case ADC_ADS1115: return "ADS1115";
 
+  case ADC_ADS1219: return "ADS1219";
+
   default: return "UNKNOWN";
   }
 }
@@ -50,7 +52,7 @@ static bool mgos_ads1x1x_reset(struct mgos_ads1x1x *dev) {
 struct mgos_ads1x1x *mgos_ads1x1x_create(struct mgos_i2c *i2c, uint8_t i2caddr, enum mgos_ads1x1x_type type) {
   struct mgos_ads1x1x *dev = NULL;
 
-  if (!i2c || type == ADC_NONE || type > ADC_ADS1115) {
+  if (!i2c || type == ADC_NONE || type > ADC_ADS1219) {
     return NULL;
   }
 
@@ -248,10 +250,49 @@ bool mgos_ads1x1x_set_dr(struct mgos_ads1x1x *dev, enum mgos_ads1x1x_dr dr) {
     }
     break;
 
+    case ADC_ADS1219:
+      switch (dr)
+      {
+      case MGOS_ADS1X1X_SPS_MIN:
+      case MGOS_ADS1X1X_SPS_DEFAULT:
+      case MGOS_ADS1X1X_SPS_20:
+        val = 0;
+        break;
+
+      case MGOS_ADS1X1X_SPS_90:
+        val = 1;
+        break;
+      
+      case MGOS_ADS1X1X_SPS_330:
+        val = 2;
+        break;
+
+      case MGOS_ADS1X1X_SPS_MAX:
+      case MGOS_ADS1X1X_SPS_1000:
+        val = 3;
+        break;
+
+      default: return false;
+      }
+
   default: return false;
   }
 
-  return mgos_i2c_setbits_reg_w(dev->i2c, dev->i2caddr, MGOS_ADS1X1X_REG_POINTER_CONF, 5, 3, val);
+  switch (dev->type) {
+  case ADC_ADS1113:
+  case ADC_ADS1114:
+  case ADC_ADS1115:
+  case ADC_ADS1013:
+  case ADC_ADS1014:
+  case ADC_ADS1015:
+    return mgos_i2c_setbits_reg_w(dev->i2c, dev->i2caddr, MGOS_ADS1X1X_REG_POINTER_CONF, 5, 3, val);
+
+  case ADC_ADS1219:
+    uint8_t reg_write_data[2] = { MGOD_ADS1219_COM_RR_CONF, (uint8_t) val << 2 };
+    return mgos_i2c_write(dev->i2c, dev->i2caddr, reg_write_data, 2, true);
+
+  default: return false;
+  }
 }
 
 bool mgos_ads1x1x_get_dr(struct mgos_ads1x1x *dev, enum mgos_ads1x1x_dr *dr) {
@@ -260,9 +301,27 @@ bool mgos_ads1x1x_get_dr(struct mgos_ads1x1x *dev, enum mgos_ads1x1x_dr *dr) {
   if (!dev || !dr) {
     return false;
   }
-  if (!mgos_i2c_getbits_reg_w(dev->i2c, dev->i2caddr, MGOS_ADS1X1X_REG_POINTER_CONF, 5, 3, &val)) {
-    return false;
+
+  switch (dev->type) {
+  case ADC_ADS1113:
+  case ADC_ADS1114:
+  case ADC_ADS1115:
+  case ADC_ADS1013:
+  case ADC_ADS1014:
+  case ADC_ADS1015:
+    if (!mgos_i2c_getbits_reg_w(dev->i2c, dev->i2caddr, MGOS_ADS1X1X_REG_POINTER_CONF, 5, 3, &val)) {
+      return false;
+    }
+
+  case ADC_ADS1219:
+    if (!mgos_i2c_getbits_reg_b(dev->i2c, dev->i2caddr, MGOD_ADS1219_COM_RR_CONF, 2, 2, (uint8_t*)&val)) {
+      return false;
+    }
+
+  default: return false;
   }
+
+  
   switch (dev->type) {
   case ADC_ADS1013:
   case ADC_ADS1014:
@@ -305,6 +364,18 @@ bool mgos_ads1x1x_get_dr(struct mgos_ads1x1x *dev, enum mgos_ads1x1x_dr *dr) {
     default: *dr = MGOS_ADS1X1X_SPS_860; break;
     }
     break;
+
+    case ADC_ADS1219:
+      switch (val) {
+        case 0: *dr = MGOS_ADS1X1X_SPS_20; break;
+        
+        case 1: *dr = MGOS_ADS1X1X_SPS_90; break;
+        
+        case 2: *dr = MGOS_ADS1X1X_SPS_330; break;
+        
+        default: *dr = MGOS_ADS1X1X_SPS_1000; break;
+      }
+      break;
 
   default: return false;
   }
