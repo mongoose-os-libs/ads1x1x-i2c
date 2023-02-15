@@ -46,7 +46,21 @@ static bool mgos_ads1x1x_reset(struct mgos_ads1x1x *dev) {
     return false;
   }
 
-  return mgos_i2c_write_reg_w(dev->i2c, dev->i2caddr, MGOS_ADS1X1X_REG_POINTER_CONF, 0x8583);
+  switch (dev->type) {
+  case ADC_ADS1113:
+  case ADC_ADS1114:
+  case ADC_ADS1115:
+  case ADC_ADS1013:
+  case ADC_ADS1014:
+  case ADC_ADS1015:
+    return mgos_i2c_write_reg_w(dev->i2c, dev->i2caddr, MGOS_ADS1X1X_REG_POINTER_CONF, 0x8583);
+
+  case ADC_ADS1219:
+    uint8_t command = MGOS_ADS1219_COM_RESET;
+    return mgos_i2c_write(dev->i2c, dev->i2caddr, &command, 1, true);
+
+  default: return false;
+  }
 }
 
 struct mgos_ads1x1x *mgos_ads1x1x_create(struct mgos_i2c *i2c, uint8_t i2caddr, enum mgos_ads1x1x_type type) {
@@ -56,7 +70,7 @@ struct mgos_ads1x1x *mgos_ads1x1x_create(struct mgos_i2c *i2c, uint8_t i2caddr, 
     return NULL;
   }
 
-  dev = calloc(1, sizeof(struct mgos_ads1x1x));
+  dev = (struct mgos_ads1x1x *) calloc(1, sizeof(struct mgos_ads1x1x));
   if (!dev) {
     return NULL;
   }
@@ -68,6 +82,7 @@ struct mgos_ads1x1x *mgos_ads1x1x_create(struct mgos_i2c *i2c, uint8_t i2caddr, 
   switch (type) {
   case ADC_ADS1015:
   case ADC_ADS1115:
+  case ADC_ADS1219:
     dev->channels = 4;
     break;
 
@@ -94,7 +109,7 @@ bool mgos_ads1x1x_destroy(struct mgos_ads1x1x **dev) {
   return true;
 }
 
-bool mgos_ads1x1x_set_fsr(struct mgos_ads1x1x *dev, enum mgos_ads1x1x_fsr fsr) {
+bool mgos_ads1x1x_set_fsr(struct mgos_ads1x1x *dev, enum mgos_ads1x1x_fsr fsr) {      // TODO ADS1219 instead of FSR setting, external FSR, programmable gain
   uint16_t val;
 
   if (!dev) {
@@ -128,8 +143,8 @@ bool mgos_ads1x1x_set_fsr(struct mgos_ads1x1x *dev, enum mgos_ads1x1x_fsr fsr) {
     val = 2;
   }
 
-  // ADS1x13 only supports 2.048V
-  if ((dev->type == ADC_ADS1013 || dev->type == ADC_ADS1113) && val != 2) {
+  // ADS1x13 only supports 2.048V, ADS1219 natively supports 2.048V or external reference
+  if ((dev->type == ADC_ADS1013 || dev->type == ADC_ADS1113 || dev->type == ADC_ADS1219) && val != 2) {
     return false;
   }
 
@@ -142,6 +157,13 @@ bool mgos_ads1x1x_get_fsr(struct mgos_ads1x1x *dev, enum mgos_ads1x1x_fsr *fsr) 
   if (!dev || !fsr) {
     return false;
   }
+
+  if (dev->type == ADC_ADS1219)
+  {
+    *fsr = MGOS_ADS1X1X_FSR_2048;
+    return true;
+  }
+
   if (!mgos_i2c_getbits_reg_w(dev->i2c, dev->i2caddr, MGOS_ADS1X1X_REG_POINTER_CONF, 9, 3, &val)) {
     return false;
   }
@@ -387,7 +409,7 @@ bool mgos_ads1x1x_read(struct mgos_ads1x1x *dev, uint8_t chan, int16_t *result) 
 }
 
 // if chanN is 0xff, perform a single ended read (with chanP against GND)
-bool mgos_ads1x1x_read_diff(struct mgos_ads1x1x *dev, uint8_t chanP, uint8_t chanN, int16_t *result) {
+bool mgos_ads1x1x_read_diff(struct mgos_ads1x1x *dev, uint8_t chanP, uint8_t chanN, int16_t *result) {    // TODO check for ADS1219
   uint16_t conf_val;
   int16_t  result_val;
   uint16_t mux;
