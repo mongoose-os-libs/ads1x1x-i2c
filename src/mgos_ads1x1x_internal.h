@@ -25,6 +25,9 @@ extern "C" {
 #define MGOS_ADS1X1X_I2C_ADDR            (0x48)
 // ADS1219 can be configured with address 0x40 - 0x4F
 
+// ADS1219 data ready not pin
+#define MGOS_ADS1219_DRDYN_PIN           (2)
+
 // Registers
 #define MGOS_ADS1X1X_REG_POINTER_MASK    (0x03)
 #define MGOS_ADS1X1X_REG_POINTER_CONV    (0x00)
@@ -42,8 +45,8 @@ extern "C" {
 #define MGOS_ADS1219_COM_RREG             (0x20) // Read register
 #define MGOS_ADS1219_COM_WREG             (0x30) // Write to configuration register
 
-#define MGOD_ADS1219_COM_RR_CONF          (MGOS_ADS1219_COM_RREG | (MGOS_ADS1219_REG_CONF << 2))
-#define MGOD_ADS1219_COM_RR_STAT          (MGOS_ADS1219_COM_RREG | (MGOS_ADS1219_REG_STAT << 2))
+#define MGOS_ADS1219_COM_RR_CONF          (MGOS_ADS1219_COM_RREG | (MGOS_ADS1219_REG_CONF << 2))
+#define MGOS_ADS1219_COM_RR_STAT          (MGOS_ADS1219_COM_RREG | (MGOS_ADS1219_REG_STAT << 2))
 
 
 struct mgos_ads1x1x {

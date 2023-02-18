@@ -70,6 +70,11 @@ enum mgos_ads1x1x_dr {
   MGOS_ADS1X1X_SPS_MAX,     // 860SPS for ADS111X, 1000SPS for ADS1219, 3300SPS for ADS101X
 };
 
+enum mgos_ads1x1x_gain {
+  MGOS_ADS1X1X_GAIN_1,      // 1GAIN, ADS1219 only
+  MGOS_ADS1X1X_GAIN_4       // 4GAIN, ADS1219 only
+};
+
 /*
  * Initialize a ADS1X1X on the I2C bus `i2c` at address specified in `i2caddr`
  * parameter (default ADS1X1X is on address 0x48). The device will be polled for
