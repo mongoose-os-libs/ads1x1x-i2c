@@ -317,16 +317,20 @@ bool mgos_ads1x1x_set_dr(struct mgos_ads1x1x *dev, enum mgos_ads1x1x_dr dr) {
     return mgos_i2c_setbits_reg_w(dev->i2c, dev->i2caddr, MGOS_ADS1X1X_REG_POINTER_CONF, 5, 3, val);
 
   case ADC_ADS1219:
-    uint8_t reg_write_data[2] = { MGOS_ADS1219_COM_RR_CONF, (uint8_t) val << 2 };
-    return mgos_i2c_write(dev->i2c, dev->i2caddr, reg_write_data, 2, true);
+    uint8_t conf_read_data = mgos_i2c_read_reg_b(dev->i2c, dev->i2caddr, MGOS_ADS1219_COM_RR_CONF); // Read the register
+  
+    if (conf_read_data == -1)
+      return false;
+
+    conf_read_data &= ~( 0b11 << 2 ); // Clear the DR bit field (2-bits)
+    conf_read_data |= ( val << 2 );   // Set the new DR
+
+    uint8_t reg_write_data[2] = { MGOS_ADS1219_COM_RR_CONF, conf_read_data }; // Refer to datasheet
+    return mgos_i2c_write(dev->i2c, dev->i2caddr, reg_write_data, 2, true);   // Write the register
 
   default: return false;
   }
 }
-
-// TODO bool mgos_ads1x1x_set_gain(struct mgos_ads1x1x *dev, enum mgos_ads1x1x_gain gain);
-
-// TODO bool mgos_ads1x1x_get_gain(struct mgos_ads1x1x *dev, enum mgos_ads1x1x_gain *gain);
 
 bool mgos_ads1x1x_get_dr(struct mgos_ads1x1x *dev, enum mgos_ads1x1x_dr *dr) {
   uint16_t val;
