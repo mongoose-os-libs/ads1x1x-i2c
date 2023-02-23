@@ -110,6 +110,13 @@ bool mgos_ads1x1x_get_fsr(struct mgos_ads1x1x *dev, enum mgos_ads1x1x_fsr *fsr);
 bool mgos_ads1x1x_set_dr(struct mgos_ads1x1x *dev, enum mgos_ads1x1x_dr dr);
 bool mgos_ads1x1x_get_dr(struct mgos_ads1x1x *dev, enum mgos_ads1x1x_dr *dr);
 
+/* Get or Set the Gain. Only the ADS1219 suppports this configuration.
+ *
+ * Returns true on success, false otherwise.
+ */
+bool mgos_ads1x1x_set_gain(struct mgos_ads1x1x *dev, enum mgos_ads1x1x_gain gain);
+bool mgos_ads1x1x_get_gain(struct mgos_ads1x1x *dev, enum mgos_ads1x1x_gain *gain);
+
 /* Read a channel from the ADC and return the read value in `result`. If the
  * channel was invalid, or an error occurred, false is returned and the result
  * cannot be relied upon.
