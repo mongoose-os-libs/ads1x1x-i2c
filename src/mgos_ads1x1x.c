@@ -96,11 +96,11 @@ struct mgos_ads1x1x *mgos_ads1x1x_create(struct mgos_i2c *i2c, uint8_t i2caddr, 
     return NULL;
   }
   LOG(LL_INFO, ("%s initialized at I2C 0x%02x", mgos_ads1x1x_type_str(dev), dev->i2caddr));
-
-  // Initialize DRDYN GPIO pin
+  
   if (dev->type == ADC_ADS1219) {
-    if ( !mgos_gpio_set_mode(MGOS_ADS1219_DRDYN_PIN, MGOS_GPIO_MODE_INPUT) )
-    return NULL;
+    if ( !mgos_gpio_set_mode(MGOS_ADS1219_DRDYN_PIN, MGOS_GPIO_MODE_INPUT) ) {  // Initialize DRDYN GPIO pin
+      return NULL;
+    }
   }
 
   return dev;
@@ -350,11 +350,13 @@ bool mgos_ads1x1x_get_dr(struct mgos_ads1x1x *dev, enum mgos_ads1x1x_dr *dr) {
     if (!mgos_i2c_getbits_reg_w(dev->i2c, dev->i2caddr, MGOS_ADS1X1X_REG_POINTER_CONF, 5, 3, &val)) {
       return false;
     }
+    break;
 
   case ADC_ADS1219:
     if (!mgos_i2c_getbits_reg_b(dev->i2c, dev->i2caddr, MGOS_ADS1219_COM_RR_CONF, 2, 2, (uint8_t*)&val)) {
       return false;
     }
+    break;
 
   default: return false;
   }
@@ -447,8 +449,8 @@ bool mgos_ads1x1x_set_gain(struct mgos_ads1x1x *dev, enum mgos_ads1x1x_gain gain
     if (conf_reg_data == -1) {
       return false;
     }
-    conf_reg_data &= ~( 1 << 4 ); // Clear the Gain bit
-    conf_reg_data |= ( val << 4 );   // Set the new Gain
+    conf_reg_data &= ~( 1 << 4 );     // Clear the Gain bit
+    conf_reg_data |= ( val << 4 );    // Set the new Gain
 
     uint8_t reg_write_data[2] = { MGOS_ADS1219_COM_RR_CONF, conf_reg_data }; // Refer to datasheet
     return mgos_i2c_write(dev->i2c, dev->i2caddr, reg_write_data, 2, true);   // Write the register
@@ -459,7 +461,6 @@ bool mgos_ads1x1x_set_gain(struct mgos_ads1x1x *dev, enum mgos_ads1x1x_gain gain
 
 bool mgos_ads1x1x_get_gain(struct mgos_ads1x1x *dev, enum mgos_ads1x1x_gain *gain)
 {
-  // TODO implement
   uint8_t val;
 
   if (!dev || !gain) {
@@ -471,11 +472,11 @@ bool mgos_ads1x1x_get_gain(struct mgos_ads1x1x *dev, enum mgos_ads1x1x_gain *gai
     if (!mgos_i2c_getbits_reg_b(dev->i2c, dev->i2caddr, MGOS_ADS1219_COM_RR_CONF, 4, 1, &val)) {
       return false;
     }
+    break;
 
   default: return false;
   }
 
-  
   switch (dev->type) {
     case ADC_ADS1219:
       switch (val) {
@@ -490,16 +491,79 @@ bool mgos_ads1x1x_get_gain(struct mgos_ads1x1x *dev, enum mgos_ads1x1x_gain *gai
   return true;
 }
 
-bool mgos_ads1x1x_read(struct mgos_ads1x1x *dev, uint8_t chan, int16_t *result) {
-  return mgos_ads1x1x_read_diff(dev, chan, 0xff, result);
+bool mgos_ads1x1x_set_cmode(struct mgos_ads1x1x *dev, enum mgos_ads1x1x_cmode cmode)
+{
+  uint8_t val;
+
+  if (!dev) {
+    return false;
+  }
+
+  switch ( cmode ) {
+    case MGOS_ADS1X1X_CMODE_SNGL:
+    val = 0;
+    break;
+    
+    case MGOS_ADS1X1X_CMODE_CONT:
+    val = 1;
+    break;
+
+    default: return false;
+  }
+
+  switch (dev->type) {
+  case ADC_ADS1219:
+    uint8_t conf_reg_data = mgos_i2c_read_reg_b(dev->i2c, dev->i2caddr, MGOS_ADS1219_COM_RR_CONF); // Read the register
+
+    if (conf_reg_data == -1) {
+      return false;
+    }
+
+    conf_reg_data &= ~( 1 << 1 );     // Clear the CM bit
+    conf_reg_data |= ( val << 1 );    // Set the new CM
+
+    uint8_t reg_write_data[2] = { MGOS_ADS1219_COM_RR_CONF, conf_reg_data }; // Refer to datasheet
+    return mgos_i2c_write(dev->i2c, dev->i2caddr, reg_write_data, 2, true);   // Write the register
+
+  default: return false;
+  }
 }
 
-// if chanN is 0xff, perform a single ended read (with chanP against GND)
-bool mgos_ads1x1x_read_diff(struct mgos_ads1x1x *dev, uint8_t chanP, uint8_t chanN, int32_t *result) {
+bool mgos_ads1x1x_get_cmode(struct mgos_ads1x1x *dev, enum mgos_ads1x1x_cmode *cmode)
+{
+  uint8_t val;
+
+  if (!dev || !gain) {
+    return false;
+  }
+
+  switch (dev->type) {
+  case ADC_ADS1219:
+    if (!mgos_i2c_getbits_reg_b(dev->i2c, dev->i2caddr, MGOS_ADS1219_COM_RR_CONF, 1, 1, &val)) {
+      return false;
+    }
+    break;
+
+  default: return false;
+  }
+
+  switch (dev->type) {
+    case ADC_ADS1219:
+      switch (val) {
+        case 0: *cmode = MGOS_ADS1X1X_CMODE_SNGL; break;
+        
+        default: *cmode = MGOS_ADS1X1X_CMODE_CONT; break;
+      }
+      break;
+
+  default: return false;
+  }
+  return true;
+}
+
+bool mgos_ads1x1x_set_channel(struct mgos_ads1x1x *dev,  uint8_t chanP, uint8_t chanN)
+{
   uint16_t conf_val;
-  int16_t  result_val;
-  uint8_t  result_val_arr[3];
-  uint16_t mux;
 
   if (!dev) {
     return false;
@@ -571,9 +635,13 @@ bool mgos_ads1x1x_read_diff(struct mgos_ads1x1x *dev, uint8_t chanP, uint8_t cha
   case ADC_ADS1014:
   case ADC_ADS1015:
     conf_val = mgos_i2c_read_reg_w(dev->i2c, dev->i2caddr, MGOS_ADS1X1X_REG_POINTER_CONF);
+    break;
 
   case ADC_ADS1219:
     conf_val = mgos_i2c_read_reg_b(dev->i2c, dev->i2caddr, MGOS_ADS1219_COM_RR_CONF);
+    break;
+
+  default: return false;
   }
 
   switch (dev->type) {
@@ -583,28 +651,162 @@ bool mgos_ads1x1x_read_diff(struct mgos_ads1x1x *dev, uint8_t chanP, uint8_t cha
   case ADC_ADS1013:
   case ADC_ADS1014:
   case ADC_ADS1015:
-    {
-      // Clear and then set MUX bits
-      conf_val |= (7 << 12);                                                                    // TODO check need to set the bits (original code)
-      conf_val &= ~(7 << 12);
-      conf_val |= (mux << 12);
+    // Clear and then set MUX bits
+    conf_val |= (7 << 12);                                                                    // TODO check need to set the bits (original code)
+    conf_val &= ~(7 << 12);
+    conf_val |= (mux << 12);
 
-      conf_val |= (1 << 15); // OS - start conversion
-      conf_val |= (1 << 8);  // MODE - singleshot
+    conf_val |= (1 << 15); // OS - start conversion
+    conf_val |= (1 << 8);  // MODE - singleshot
 
-      mgos_i2c_write_reg_w(dev->i2c, dev->i2caddr, MGOS_ADS1X1X_REG_POINTER_CONF, conf_val);
+    return (mgos_i2c_write_reg_w(dev->i2c, dev->i2caddr, MGOS_ADS1X1X_REG_POINTER_CONF, conf_val));
+    break;
+
+  case ADC_ADS1219:
+    // Clear and then set MUX bits
+    conf_val |= (7 << 5);                                                                    // TODO check need to set the bits
+    conf_val &= ~(7 << 5);
+    conf_val |= (mux << 5);
+
+    conf_val &= ~(1 << 1);  // MODE - singleshot, clear bit
+
+    return (mgos_i2c_write_reg_b(dev->i2c, dev->i2caddr, MGOS_ADS1219_COM_RR_CONF, conf_val));       // TODO warning: uint8_t <-- conf_val [uint16_t]
+    break;
+
+  default: return false;
+  }
+}
+
+bool mgos_ads1x1x_get_channel(struct mgos_ads1x1x *dev,  uint8_t *chanP, uint8_t *chanN)
+{
+  uint16_t mux;
+
+  if (!dev || !chanP || !chanN) {
+    return false;
+  }
+
+  // Get MUX data from register
+  switch (dev->type) {
+  case ADC_ADS1113:
+  case ADC_ADS1114:
+  case ADC_ADS1115:
+  case ADC_ADS1013:
+  case ADC_ADS1014:
+  case ADC_ADS1015:
+    if (!mgos_i2c_getbits_reg_w(dev->i2c, dev->i2caddr, MGOS_ADS1X1X_REG_POINTER_CONF, 12, 3, &mux)) {
+      return false;
+    }
+    break;
+
+  case ADC_ADS1219:
+    if (!mgos_i2c_getbits_reg_w(dev->i2c, dev->i2caddr, MGOS_ADS1219_COM_RR_CONF, 5, 3, (uint8_t*)&mux)) {
+      return false;
+    }
+    break;
+
+  default: return false;
+  }
+
+  // Cross check the MUX data within ADC devices to return channels
+  switch (dev->type) {
+  case ADC_ADS1113:
+  case ADC_ADS1114:
+  case ADC_ADS1115:
+  case ADC_ADS1013:
+  case ADC_ADS1014:
+  case ADC_ADS1015:
+    switch (mux) {
+    case 0:
+      *chanP = 0;
+      *chanN = 1;
+      return true;
+    case 1:
+      *chanP = 0;
+      *chanN = 3;
+      return true;
+    case 2:
+      *chanP = 1;
+      *chanN = 3;
+      return true;
+    case 3:
+      *chanP = 2;
+      *chanN = 3;
+      return true;
+    case 4:
+      *chanP = 0;
+      *chanN = 0xff;
+      return true;
+    case 5:
+      *chanP = 1;
+      *chanN = 0xff;
+      return true;
+    case 6:
+      *chanP = 2;
+      *chanN = 0xff;
+      return true;
+    case 7:
+      *chanP = 3;
+      *chanN = 0xff;
+      return true;
+    default: return false;
     }
   case ADC_ADS1219:
-    {
-      // Clear and then set MUX bits
-      conf_val |= (7 << 5);                                                                    // TODO check need to set the bits
-      conf_val &= ~(7 << 5);
-      conf_val |= (mux << 5);
-
-      conf_val &= ~(1 << 1);  // MODE - singleshot, clear bit
-
-      mgos_i2c_write_reg_b(dev->i2c, dev->i2caddr, MGOS_ADS1219_COM_RR_CONF, conf_val);       // TODO warning: uint8_t <-- conf_val [uint16_t]
+    switch (mux) {
+    case 0:
+      *chanP = 0;
+      *chanN = 1;
+      return true;
+    case 1:
+      *chanP = 2;
+      *chanN = 3;
+      return true;
+    case 2:
+      *chanP = 1;
+      *chanN = 2;
+      return true;
+    case 3:
+      *chanP = 0;
+      *chanN = 0xff;
+      return true;
+    case 4:
+      *chanP = 1;
+      *chanN = 0xff;
+      return true;
+    case 5:
+      *chanP = 2;
+      *chanN = 0xff;
+      return true;
+    case 6:
+      *chanP = 3;
+      *chanN = 0xff;
+      return true;
+    case 7:
+      *chanP = 0xff;
+      *chanN = 0xff;
+      return true;
+    default: return false;
     }
+  default: return false;
+  }
+}
+
+bool mgos_ads1x1x_is_data_ready(struct mgos_ads1x1x *dev)
+{
+  return (!mgos_gpio_read(MGOS_ADS1219_DRDYN_PIN));
+}
+
+bool mgos_ads1x1x_read(struct mgos_ads1x1x *dev, uint8_t chan, int16_t *result) {
+  return mgos_ads1x1x_read_diff(dev, chan, 0xff, result);
+}
+
+// if chanN is 0xff, perform a single ended read (with chanP against GND)
+bool mgos_ads1x1x_read_diff(struct mgos_ads1x1x *dev, uint8_t chanP, uint8_t chanN, int32_t *result) {
+  int16_t  result_val;
+  uint8_t  result_val_arr[3];
+  uint16_t mux;
+
+  if (!mgos_ads1x1x_set_channel(dev, chanP, chanN)) { // Set the MUX
+    return false;
   }
 
   if (dev->type == ADC_ADS1219) {
@@ -613,7 +815,7 @@ bool mgos_ads1x1x_read_diff(struct mgos_ads1x1x *dev, uint8_t chanP, uint8_t cha
 
   // ADS1219 signals when the conversion is done, ADS101X has 1ms conversion delay, ADS111X has 8ms.
   if (dev->type == ADC_ADS1219) {
-    while (mgos_gpio_read(MGOS_ADS1219_DRDYN_PIN))                                            // TODO look up for better way as this might fail
+    while ( !mgos_ads1x1x_is_data_ready(dev) )                                            // TODO look up for better way as this might fail
       ;
   } else if (dev->type >= ADC_ADS1113) {
     mgos_usleep(8000);

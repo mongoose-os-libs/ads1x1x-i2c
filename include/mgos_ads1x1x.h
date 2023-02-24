@@ -75,6 +75,11 @@ enum mgos_ads1x1x_gain {
   MGOS_ADS1X1X_GAIN_4       // 4GAIN, ADS1219 only
 };
 
+enum mgos_ads1x1x_cmode {
+  MGOS_ADS1X1X_CMODE_SNGL,  // Single conversion mode, ADS1219 only
+  MGOS_ADS1X1X_CMODE_CONT     // Continuos conversion mode, ADS1219 only
+}
+
 /*
  * Initialize a ADS1X1X on the I2C bus `i2c` at address specified in `i2caddr`
  * parameter (default ADS1X1X is on address 0x48). The device will be polled for
@@ -116,6 +121,26 @@ bool mgos_ads1x1x_get_dr(struct mgos_ads1x1x *dev, enum mgos_ads1x1x_dr *dr);
  */
 bool mgos_ads1x1x_set_gain(struct mgos_ads1x1x *dev, enum mgos_ads1x1x_gain gain);
 bool mgos_ads1x1x_get_gain(struct mgos_ads1x1x *dev, enum mgos_ads1x1x_gain *gain);
+
+/* Get or Set the conversion mode.
+ * Currently only implemented for ADS1219.
+ * Returns true on success, false otherwise.
+ */
+bool mgos_ads1x1x_set_cmode(struct mgos_ads1x1x *dev, enum mgos_ads1x1x_cmode cmode);
+bool mgos_ads1x1x_get_cmode(struct mgos_ads1x1x *dev, enum mgos_ads1x1x_cmode *cmode);
+
+/* Get or Set the channels to/in use.
+ *
+ * Returns true on success, false otherwise.
+ */
+bool mgos_ads1x1x_set_channel(struct mgos_ads1x1x *dev,  uint8_t chanP, uint8_t chanN);
+bool mgos_ads1x1x_get_channel(struct mgos_ads1x1x *dev,  uint8_t *chanP, uint8_t *chanN);
+
+/* Checks if the data is ready to be read. Only the ADS1219 suppports this configuration.
+ *
+ * Returns true for data ready, false for data not ready.
+ */
+bool mgos_ads1x1x_is_data_ready(struct mgos_ads1x1x *dev);
 
 /* Read a channel from the ADC and return the read value in `result`. If the
  * channel was invalid, or an error occurred, false is returned and the result
